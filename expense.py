@@ -1,9 +1,12 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import requests
+from bs4 import BeautifulSoup
+
 
 st.set_page_config(page_title="Financial Planning Calculator")
-
+st.title('Financial Budget Calculator')
 # Set default currency to USD
 currency_symbols = {"USD": "$", "CAD": "C$", "INR": "₹"}
 
@@ -12,7 +15,14 @@ def get_currency_symbol(currency):
     return currency_symbols.get(currency, "$")
 
 # Create a dropdown to select currency
-currency = st.selectbox("Select Currency", options=["USD", "CAD", "INR"])
+currency = st.selectbox("Select Currency", options=["USD", "CAD", "INR", 'MEX'])
+
+country_tags = {
+    'USD': 'www',
+    'CAD': 'ca',
+    'INR': 'in',
+    'MEX': 'mx'
+}
 
 currency_symbol = get_currency_symbol(currency)
 
@@ -37,9 +47,15 @@ with menu_tabs[0]:
     with colAnnualSal:
         salary = st.number_input(f"Enter your annual salary ({currency_symbol}): ", min_value=0.0, format='%f')
     with colTax:
-        tax_rate = st.number_input("Enter your tax rate(%): ", min_value=0.0, format='%f')
+        base_url = f'https://{country_tags[currency]}.talent.com/tax-calculator?salary={salary}&from=year'
+        response = requests.get(base_url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        tax_element = soup.select_one('#taxes > div:nth-child(2) > div.c-card.c-card--bottom > div > div.c-card__pie-chart > div > div.l-card__tag-container.l-card__tag-right > div.c-card__tax-number')
+        tax_rate = tax_element.text.strip()
+        st.metric(label="Anual Tax rate", value=f"{tax_rate}")
 
-    tax_rate = tax_rate / 100.0
+
+    tax_rate = float(tax_rate.replace('%','')) / 100.0
     salary_after_taxes = salary * (1 - tax_rate)
     monthly_takehome_salary = round(salary_after_taxes / 12.0, 2)
     st.metric(label="Monthly Take-Home Income", value=f"{currency_symbol}{monthly_takehome_salary:,.2f}")
@@ -158,4 +174,35 @@ with menu_tabs[4]:
         st.write(f"You have achieved {progress:.2f}% of your goal '{goal_name}'.")
 
     st.write("Add multiple goals to track your progress effectively!")
+# Define theme and branding styles
+def apply_branding_styles():
+    st.markdown(
+        """
+        <style>
+        /* General styles */
+        body {
+            font-family: 'Arial', sans-serif;
+        }
+        h1, h2, h3 {
+            color: #E31837; 
+        }
+        div[data-testid="stMetricValue"] {
+            color: #E31837; 
+        }
+        div[data-testid="stProgress"] div[role="progressbar"] {
+            background-color: #E31837; 
+        }
+        div[data-baseweb="tab"] > button {
+            color: #E31837;
+            font-weight: bold;
+        }
+        div[data-baseweb="tab"] > button[aria-selected="true"] {
+            border-bottom: 2px solid #E31837;
+            color: black;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+apply_branding_styles()
